@@ -2,28 +2,46 @@ import { router } from "expo-router";
 import { useState } from "react";
 import { Alert, Pressable, Text, TextInput, View } from "react-native";
 
+import { addDoc, collection, serverTimestamp } from "firebase/firestore";
+import { auth, db } from "../../firebaseConfig";
+
 export default function AddProduct() {
   const [name, setName] = useState("");
   const [price, setPrice] = useState("");
   const [location, setLocation] = useState("");
+  const [loading, setLoading] = useState(false);
 
-  const submit = () => {
+  const handleAddProduct = async () => {
     if (!name || !price || !location) {
       Alert.alert("Error", "Fill all fields");
       return;
     }
 
-    global.products = global.products || [];
+    try {
+      setLoading(true);
 
-    global.products.push({
-      id: Date.now().toString(),
-      name,
-      price,
-      location,
-      seller: global.userName || "Seller",
-    });
+      const user = auth.currentUser;
+      if (!user) {
+        Alert.alert("Error", "Not authenticated");
+        return;
+      }
 
-    router.replace("listings");
+      await addDoc(collection(db, "products"), {
+        name,
+        price: Number(price),
+        location,
+        sellerId: user.uid,
+        createdAt: serverTimestamp(),
+      });
+
+      Alert.alert("Success", "Product added");
+      router.replace("listings");
+
+    } catch (err) {
+      Alert.alert("Error", err.message);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -55,11 +73,12 @@ export default function AddProduct() {
       />
 
       <Pressable
-        onPress={submit}
+        onPress={handleAddProduct}
+        disabled={loading}
         className="mt-8 bg-blue-600 py-4 rounded-xl"
       >
         <Text className="text-center text-white text-lg font-semibold">
-          Save Product
+          {loading ? "Saving..." : "Save Product"}
         </Text>
       </Pressable>
     </View>
